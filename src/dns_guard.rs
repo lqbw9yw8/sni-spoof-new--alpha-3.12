@@ -74,7 +74,13 @@ pub fn block_port_53_except_localhost_spec() -> WfpFilterSpec {
 /// crash before `Drop` can run.
 #[must_use = "dropping WfpGuard removes the DNS policy"]
 pub struct WfpGuard {
+    // Held purely for RAII: dropping this `wfp::Guard` removes the WFP filters
+    // and closes the BFE session (dns_guard's whole point). The field is
+    // deliberately never *read*, which is exactly what dead_code would flag —
+    // and CI runs with RUSTFLAGS="-D warnings", so the lint is silenced here
+    // with the reason stated rather than by weakening the flag.
     #[cfg(windows)]
+    #[allow(dead_code)]
     inner: wfp::Guard,
 }
 

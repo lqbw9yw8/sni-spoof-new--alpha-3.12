@@ -938,6 +938,17 @@ fn backend_main() {
     let reload_snapshot = snapshot.clone();
     let reload_requested = requested_profile.clone();
     let reload_settings = settings.clone();
+    // The hot-reload watcher can request a full graceful stop by flipping
+    // this watch channel — the native GUI does exactly that by dropping a
+    // `<config>.stop` file, so a GUI "Stop" restores the system proxy
+    // instead of TerminateProcess-ing the backend (audit Cat.1).
+    //
+    // Created HERE, before the watcher thread is spawned: that thread moves
+    // the sender in (reload_stop_tx below) and the tokio::select! near the
+    // end of this function awaits the receiver. Creating it later — as an
+    // earlier revision did, next to the select! — left `stop_tx` out of
+    // scope at the spawn site (E0425).
+    let (stop_tx, mut stop_rx) = tokio::sync::watch::channel(false);
     let reload_stop_tx = stop_tx;
     std::thread::spawn(move || {
         let mut watcher = config::HotReloadWatcher::new(std::path::PathBuf::from(reload_path));
@@ -1110,11 +1121,9 @@ fn backend_main() {
         .enable_all()
         .build()
         .expect("tokio runtime");
-    // The hot-reload watcher can request a full graceful stop by flipping
-    // this watch channel — the native GUI does exactly that by dropping a
-    // `<config>.stop` file, so a GUI "Stop" restores the system proxy
-    // instead of TerminateProcess-ing the backend (audit Cat.1).
-    let (stop_tx, mut stop_rx) = tokio::sync::watch::channel(false);
+    // The stop watch channel (stop_tx / stop_rx) is created further up,
+    // immediately before the hot-reload thread spawn: that thread moved the
+    // sender in, and the select! below awaits this receiver.
     rt.block_on(async {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {

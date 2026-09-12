@@ -1,5 +1,5 @@
 {
-  "commit": "d28fce9",
+  "commit": "f771baf",
   "modules": {
     "anti_fingerprint": {
       "lines": 192,
@@ -44,7 +44,7 @@
       "unsafe": false
     },
     "dns_guard": {
-      "lines": 711,
+      "lines": 717,
       "tests": 5,
       "tag": "PARTIAL",
       "win": 3,
@@ -156,7 +156,7 @@
       "unsafe": false
     },
     "main": {
-      "lines": 1408,
+      "lines": 1417,
       "tests": 7,
       "tag": null,
       "win": 8,
