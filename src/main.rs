@@ -951,7 +951,12 @@ fn backend_main() {
     let (stop_tx, mut stop_rx) = tokio::sync::watch::channel(false);
     let reload_stop_tx = stop_tx;
     std::thread::spawn(move || {
-        let mut watcher = config::HotReloadWatcher::new(std::path::PathBuf::from(reload_path));
+        // Borrow, do not move: `reload_path` is needed again inside the loop
+        // below to build the `<config>.stop` filename every iteration, so the
+        // watcher must take a PathBuf copied from the string, not the string
+        // itself (E0382 otherwise).
+        let mut watcher =
+            config::HotReloadWatcher::new(std::path::PathBuf::from(reload_path.as_str()));
         let mut last_cfg = std::time::Instant::now();
         // Last settings we know about, so the relay can be retried even
         // when the config file has not changed.
