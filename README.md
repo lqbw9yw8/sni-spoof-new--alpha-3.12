@@ -1,7 +1,7 @@
 # dpi_guard (Rust)
 
 Modular DPI-evasion engine. Crate name: `dpi_guard` (GitHub repo:
-[`lqbw9yw8/sni-spoof-new--alpha-3`](https://github.com/lqbw9yw8/sni-spoof-new--alpha-3)).
+[`lqbw9yw8/sni-spoof-new--alpha-3.12`](https://github.com/lqbw9yw8/sni-spoof-new--alpha-3.12)).
 Windows-only for packet capture/injection (WinDivert);
 every pure-logic module builds and tests on Linux/macOS/CI.
 
@@ -86,10 +86,10 @@ so a filter may whitelist the connection.
 (دکمهٔ سبز **Code → Download ZIP**):
 
 **Latest zip (branch `main`):**
-https://github.com/lqbw9yw8/sni-spoof-new--alpha-3/archive/refs/heads/main.zip
+https://github.com/lqbw9yw8/sni-spoof-new--alpha-3.12/archive/refs/heads/main.zip
 
 **Browse on GitHub:**
-https://github.com/lqbw9yw8/sni-spoof-new--alpha-3/tree/main
+https://github.com/lqbw9yw8/sni-spoof-new--alpha-3.12/tree/main
 
 ZIP را باز کن. پوشه را جایی ساده بگذار، مثلاً `C:\dpi_guard`.
 

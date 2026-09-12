@@ -12,6 +12,48 @@ source/static evidence from executed tests. A documentation change alone is
 never counted as a fix, and no Rust or Windows result is inferred from the
 JavaScript suite.
 
+> ## ⚠ Correction for the `sni-spoof-new--alpha-3.12` checkout (added 2026-09-12)
+>
+> **The header above describes a different repository and branch than the one
+> this file is now committed in.** It records `lqbw9yw8/sni-spoof-new--alpha-3`
+> at `arena/01a091d3-sni-spoof-new-alpha-3`, with implementation commits
+> `969d22d`, `37e2b3b`, `ae7d4ea`, `42d9f52`. This checkout is
+> `lqbw9yw8/sni-spoof-new--alpha-3.12`, whose entire history is the single
+> squash upload `9c1236d` ("Add files via upload"); none of those commit SHAs
+> exist here, so the rollback commands in §1 and §5 cannot be run as written.
+>
+> **What that means for the citations below.** The `.github/workflows/*.yml:NN-NN`
+> line ranges quoted in S-01, S-04, S-05 and S-06 pointed at files that were
+> **absent from this checkout** — `git ls-files | grep '^\.github/'` returned 0
+> entries, while `README.md`, `ci/README.md` and this report all cited them.
+> The cause is documented at `docs/BAZARSI_2026_AUDIT.md:29`: the push to
+> `.github/workflows/ci.yml` was rejected because the GitHub App token lacks the
+> `workflows` permission. The hardened *source* did survive the upload; the
+> workflows did not.
+>
+> **Current state.** Those five workflows have since been reconstructed from the
+> S-01/S-04/S-05/S-06 specs and the `ci/` templates, and now exist at
+> `.github/workflows/{ci,build-windows,fuzz,release,e2e}.yml`. They are
+> `UNTESTED`: they parse as valid YAML and `release.yml`'s signing gates were
+> checked mechanically, but **no workflow in this report has been executed by
+> GitHub Actions**, so the line ranges below still refer to the sibling branch's
+> files, not to these. Do not read them as verified locations.
+>
+> **What was re-verified in this checkout on 2026-09-12.** The §3 raw output was
+> reproduced exactly: `cd uitest && npm test` → **375 passed, 0 failed**
+> (110/56/67/60/56/26), `python3 tools/gen_status.py --check` → 42 modules,
+> 448 declared tests, 0 dead fns, `python3 -m py_compile
+> scripts/assert-e2e-pcap.py` → exit 0, `git diff --check` → exit 0. Getting to
+> 375 first required restoring the missing `.gitignore`; without it
+> `test-resilience.mjs` aborted with `ENOENT` and silently dropped its 60
+> checks, so the 375 figure in §3 was **not** reproducible in this checkout
+> until then. `python3 tools/lint_docs.py` now reports 0 parity violations.
+>
+> `cargo`, `rustc`, `rustup` and `rustfmt` remain absent, so every Rust,
+> Windows, WinDivert, fuzz and release-signing result in this report stays
+> `[UNVERIFIED]` / `NOT TESTED`. Nothing below has been upgraded. See
+> `CHANGELOG.md` § "Restoring `.github/workflows/` and `.gitignore`".
+
 ## 1. Finding matrix
 
 | ID | Minimal implementation now in the tree | Exploit/failure path closed | Evidence (`file:line`) | Verification in this checkout | Rollback / recovery | Status |

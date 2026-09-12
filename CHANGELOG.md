@@ -9,6 +9,112 @@
 Baseline source release. Publish only after the Windows CI/release workflow
 has produced and verified the signed/checksummed artifact.
 
+## [Unreleased] — `main.rs` dead WFP spec calls (۲۰۲۶-۰۹-۱۲) — `PARTIAL_UNVERIFIED`
+
+- **`src/main.rs` — سه فراخوانی مرده حذف شد** (پیش‌تر خط‌های ۷۶۹-۷۷۱):
+  `init_wfp_hook_spec()`، `dns_protection_filters()` و
+  `block_port_53_except_localhost_spec()` با `let _ =` صدا زده می‌شدند. این‌ها
+  سازندهٔ خالص struct هستند (بدون فراخوانی BFE، بدون side effect، بدون
+  `Result`)، پس نتیجه‌شان بلافاصله دور ریخته می‌شد و هیچ چیزی نصب نمی‌شد.
+  نصب واقعی WFP در همان تابع با `_dns_wfp_guard` انجام می‌شود و مسیر شکستش
+  `exit(1)` است (fail-closed).
+  خطر واقعی همین بود که این سه خط **کنار** `log::info!("plaintext DNS
+  protection is active")` نشسته بودند و باربرینگ به نظر می‌رسیدند: اگر
+  رفکتور بعدی guard واقعی را حذف می‌کرد و این‌ها را نگه می‌داشت، محافظت خاموش
+  می‌شد ولی log ادعای فعال بودن می‌کرد — همان الگوی K-4/F-05 که خود پروژه قبلاً
+  باگ اعلام کرده. جای آن‌ها اکنون کامنتی است که صریحاً می‌گوید آن log صحتش را
+  از `_dns_wfp_guard` می‌گیرد و اگر جابه‌جایش کنید باید log را هم ببرید.
+- **بررسی شد که باگ زودهنگام drop نیست.** چون `dns_guard.rs:75` هشدار می‌دهد
+  drop شدن `WfpGuard` همهٔ فیلترها را حذف می‌کند، scope این binding مستقیماً از
+  روی کد خوانده شد: `_dns_wfp_guard` یک binding مستقیم در بدنهٔ
+  `backend_main()` است (خط ۵۲۴، match تا خط ۵۳۳ بسته می‌شود) و تا انتهای تابع
+  (خط ۱۲۰۲) زنده می‌ماند، یعنی **بعد از** `engine::capture_loop` در خط ۸۱۹.
+  محافظت هنگام capture برقرار است.
+- هر سه تابع با حذف این فراخوانی‌ها **مرده نشدند**: هر سه همچنان توسط تست‌های
+  واحد خودشان در `dns_guard.rs` (خط‌های ۶۷۰، ۶۷۵، ۶۸۵) صدا زده می‌شوند.
+  `tools/gen_status.py` این را تأیید می‌کند: **۰ تابع مرده، ۴۴۸ تست** بدون
+  تغییر. فقط شمار خط ماژول `main` از ۱۳۹۳ به ۱۴۰۸ رفت و `TEST_MATRIX.md` /
+  `tools/status.json` با خود ژنراتور بازتولید شدند (نه دستی).
+- تأیید در این checkout: `cd uitest && npm test` → **۳۷۵ پاس، ۰ شکست**؛
+  `python3 tools/gen_status.py --check` و `python3 tools/lint_docs.py` →
+  ۰ نقص؛ `git diff --check` → ۰.
+- **محدودیت:** این ویرایش با `cargo build` کامپایل‌چک **نشده** —
+  `static.rust-lang.org`، `sh.rustup.rs` و `static.crates.io` در این محیط با
+  `SSL_ERROR_SYSCALL` مسدود هستند، پس هیچ toolchain جدیدتر از Rust ۱.۷۵ِ apt
+  قابل نصب نیست و build کامل به‌دلیل نیاز `icu_normalizer_data` به
+  `edition2024` (Rust ≥ ~۱.۸۵) ممکن نیست. ریسک سینتکسی این ویرایش عملاً صفر
+  است (حذف سه statement کامل + افزودن کامنت؛ خالص دلیمیترها `(0,0)`)، ولی صحت
+  کامپایل جایگزین نمی‌شود.
+- Rollback: `git revert` این کامیت. بازگرداندن سه خط مرده بی‌ضرر ولی گمراه‌کننده
+  است؛ کامنت توضیحی را نگه دارید.
+
+## [Unreleased] — Restoring `.github/workflows/` and `.gitignore` after the squash upload (۲۰۲۶-۰۹-۱۲) — `PARTIAL_UNVERIFIED`
+
+این ریپو (`sni-spoof-new--alpha-3.12`) با یک کامیت squash شده ساخته شده
+(`9c1236d` «Add files via upload»). آن آپلود **سورس سخت‌شده را آورد ولی دو چیز
+را نیاورد**: پوشهٔ `.github/workflows/` و فایل `.gitignore`. هر دو در شاخهٔ
+خواهر (`sni-spoof-new--alpha-3`) وجود داشتند — `SENTRY_REPORT.md` و
+`CHANGELOG.md:39` و `ci/README.md` همه به آن‌ها ارجاع می‌دهند — ولی در این
+checkout غایب بودند، بنابراین README/SENTRY به فایل‌هایی لینک می‌دادند که
+وجود نداشت.
+
+- **`.gitignore` restored** — `DONE` (verified in this checkout). بدون آن
+  `uitest/test-resilience.mjs` با `ENOENT` کرش می‌کرد و **۶۰ چک بی‌صدا از
+  `npm test` حذف می‌شد** (خروجی `npm test` هنوز ۰ بود چون سوئیت‌های بعدی
+  اجرا نشدند). علاوه بر آن، بدون این فایل اولین `git add -A` توکن Web UI
+  (`dpi_guard.toml`)، کش DNS حاوی IP سرورها (`dpi_guard.dns_cache`)،
+  `dpi_guard.proxy_state` و باینری درایور WinDivert را کامیت می‌کرد.
+  محتوا از شواهد خود ریپو بازسازی شد، نه حدس: `src/dns_cache.rs:46`،
+  `src/observability.rs:110`، `README.md:448`، `CHANGELOG.md:203`،
+  `fuzz/README.md`، هدر `scripts/fetch-windivert.sh`.
+  `dpi_guard.toml.example` عمداً با `!` مستثنا شد چون `src/config.rs:1105`
+  آن را از `CARGO_MANIFEST_DIR` می‌خواند و باید tracked بماند.
+  مدرک: `git check-ignore -v` روی ۱۳ مسیر حساس → همه ignore؛
+  `git ls-files --error-unmatch dpi_guard.toml.example` → هنوز tracked.
+- **uitest suite** — `DONE`. با بازگشت `.gitignore` کل سوئیت سبز شد:
+  ۱۱۰ + ۵۶ + ۶۷ + ۶۰ + ۵۶ + ۲۶ = **۳۷۵ پاس، ۰ شکست** — همان عددی که
+  `SENTRY_REPORT.md:66` ادعا می‌کرد و در این checkout قابل بازتولید نبود.
+- **`tools/lint_docs.py` — دو باگ واقعی رفع شد** — `DONE` (verified both
+  directions). (۱) `check_repo_identity` با `.split(".")[0]` نام ریپو را در
+  **اولین نقطه** قطع می‌کرد، پس برای ریپویی که نامش نقطه دارد
+  (`sni-spoof-new--alpha-3.12`) حتی لینک *صحیح* به همین ریپو را به‌عنوان
+  «لینک به ریپو بیگانه» گزارش می‌کرد — این چک هرگز نمی‌توانست پاس شود.
+  اکنون فقط پسوند `.git` حذف می‌شود. (۲) `check_workflow_paths` فرض می‌کرد هر
+  منبع `Copy-Item` باید فایل کامیت‌شده باشد؛ مسیرهایی که `.gitignore` *عمداً*
+  آن‌ها را exclude می‌کند (`WinDivert.dll`/`WinDivert64.sys` که در زمان اجرا
+  توسط `scripts/fetch-windivert.ps1` با پین SHA-256 گرفته می‌شوند) از قاعده
+  مستثنا شدند. هر دو اصلاح با تست رگرسیون منفی تأیید شد: لینک به
+  `sni-spoof-new-5.6` هنوز گرفته می‌شود و `Copy-Item` یک فایل واقعاً غایب
+  هنوز گزارش می‌شود.
+- **`README.md` repo identity** — `DONE`. سه لینک که به
+  `lqbw9yw8/sni-spoof-new--alpha-3` اشاره می‌کردند به همین ریپو
+  (`--alpha-3.12`) اصلاح شدند؛ `tools/lint_docs.py` اکنون
+  **۰ نقص (۷ چک، ۸۲ فیلد Settings)** می‌دهد.
+- **پنج workflow در `.github/workflows/` بازسازی شد** — `UNTESTED`. این‌ها از
+  روی مشخصات `SENTRY_REPORT.md` (S-01، S-04، S-05، S-06) و قالب‌های `ci/`
+  نوشته شدند: `ci.yml` (fmt/build/test/clippy روی سه OS + audit/deny + jsdom +
+  docs parity)، `build-windows.yml` (آرتیفکت + SHA-256)، `fuzz.yml` (هر سه
+  تارگت با بودجهٔ زمانی محدود، کرش = شکست job، آپلود corpus/crash حتی هنگام
+  شکست)، `release.yml` (امضای **اجباری**)، `e2e.yml` (pktmon +
+  `scripts/assert-e2e-pcap.py`).
+  **هیچ‌کدام اجرا نشده‌اند.** تنها چیزی که اینجا verify شد ساختار است:
+  هر ۵ فایل با یک پارسر واقعی YAML پارس شدند و `runs-on`/`steps`/`uses|run`
+  دارند. در `release.yml` این نامتغیرها به‌صورت مکانیکی بررسی شدند: ترتیب
+  secrets-gate → verify → stage → publish، نبودِ هر
+  `continue-on-error`/`if: always()` بین verify و publish (تنها `always()`
+  پاک‌سازی گواهی است، قبل از staging)، و نبودِ هر `upload-artifact` که بتواند
+  بدون امضا چیزی منتشر کند.
+- **محدودیت صریح** — این محیط `cargo`/`rustc`/`rustup`/`rustfmt` ندارد، پس
+  **هیچ** build/test/clippy/fmt راستی اینجا اجرا نشد و هیچ نتیجهٔ Rust از
+  سوئیت jsdom استنتاج نشده. اجرای واقعی workflowها هم به توکنی با scope
+  `workflows` نیاز دارد — همان محدودیتی که در
+  `docs/BAZARSI_2026_AUDIT.md:29` مستند شده و دلیل اصلی گم‌شدن این فایل‌هاست.
+  تا زمانی که خروجی واقعی Actions ضمیمه نشود، وضعیت‌ها باید
+  `[UNVERIFIED]`/`UNTESTED` بمانند.
+- Rollback: `git revert` این کامیت. حذف `.gitignore` سوئیت تست را دوباره
+  می‌شکند و فایل‌های runtime حساس را قابل کامیت می‌کند، پس اگر workflowها را
+  نمی‌خواهید فقط `.github/` را بردارید، نه `.gitignore` را.
+
 ## [Unreleased] — DNS enforcement and resolver hardening (۲۰۲۶-۰۹-۱۲) — `PARTIAL_UNVERIFIED`
 
 - `src/dns_guard.rs` now contains real `Fwpuclnt.dll` FFI: one dynamic BFE
