@@ -1,0 +1,29 @@
+# cargo configuration for the dpi_guard workspace root.
+#
+# WHY THIS FILE EXISTS (do not delete):
+# windivert-sys' build script (build/main.rs:20-22) reads WINDIVERT_PATH and
+# calls fs::read_dir(path).unwrap(). If the variable is already set in the
+# operator's environment to a folder that no longer exists -- e.g. left over
+# from another WinDivert project or an old guide -- then every cargo command in
+# this repository dies with `Os { code: 3, kind: NotFound }` at
+# windivert-sys-*/build/main.rs:22 before a single line of dpi_guard compiles.
+#
+# `force = true` makes cargo override whatever is already in the environment
+# for every cargo run rooted here. `relative = true` resolves "." to this
+# repository root -- exactly where scripts/fetch-windivert.ps1 (and
+# build-windows.bat step [2/4]) place WinDivert.dll, WinDivert.lib and
+# WinDivert64.sys. The build script then copies those three into OUT_DIR for
+# the linker.
+#
+# Restored 2026-09-13: the squash upload that created this branch dropped this
+# file even though build-windows.bat:28-29 and docs/archive/START_HERE.md:61
+# document it, and docs/archive/AUDIT_LINE_BY_LINE.md:63 records the exact
+# panic its absence causes on a machine with a stale WINDIVERT_PATH. This is
+# the third file that upload lost, after .gitignore and .github/workflows/.
+#
+# The three driver files themselves are never committed (see .gitignore); the
+# CI workflows fetch them with scripts/fetch-windivert.ps1 before building,
+# because with WINDIVERT_PATH forced the link step requires them to exist.
+
+[env]
+WINDIVERT_PATH = { value = ".", force = true, relative = true }

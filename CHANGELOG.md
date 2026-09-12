@@ -9,6 +9,37 @@
 Baseline source release. Publish only after the Windows CI/release workflow
 has produced and verified the signed/checksummed artifact.
 
+## [Unreleased] — Restoring `.cargo/config.toml`, the third lost file (۲۰۲۶-۰۹-۱۳) — `PARTIAL_UNVERIFIED`
+
+- **`.cargo/config.toml` بازسازی شد** — سومین فایلی که آپلود squash جا گذاشت
+  (بعد از `.gitignore` و `.github/workflows/`). بدون آن، روی ماشینی که
+  `WINDIVERT_PATH` از قبل در محیطش ست شده (از یک پروژهٔ دیگر) و به پوشهٔ
+  ناموجود اشاره می‌کند، **هر** دستور cargo با این panic می‌میرد:
+  `windivert-sys-0.9.3/build/main.rs:22` → `fs::read_dir(&lib_path).unwrap()`
+  → `Os { code: 3, kind: NotFound }`. خودِ ریپو این را پیش‌بینی کرده بود:
+  `build-windows.bat:28-29` می‌گوید این فایل متغیر را force می‌کند، و
+  `docs/archive/AUDIT_LINE_BY_LINE.md:63` عیناً همین panic را مستند کرده.
+  محتوا دقیقاً همان نسخهٔ نهایی شاخهٔ خواهر است
+  (`docs/archive/GAPS_2026-09.md:285`):
+  `WINDIVERT_PATH = { value = ".", force = true, relative = true }` — یعنی
+  force هر مقدار کهنهٔ محیطی را بازنویسی می‌کند و `.` به ریشهٔ ریپو resolve
+  می‌شود، همان‌جا که `fetch-windivert.ps1` سه فایل رسمی را می‌گذارد.
+  با این فایل `build-windows.bat` دوباره end-to-end کار می‌کند.
+- **پیامد برای CI**: چون `WINDIVERT_PATH` حالا force می‌شود، build script
+  وارد شاخهٔ کپی می‌شود و روی runner تمیز (که سه فایل را ندارد) لینک شکست
+  می‌خورد — مگر اینکه job اول `scripts/fetch-windivert.ps1` را اجرا کند.
+  jobهای ویندوزی `ci.yml`، `build-windows.yml` و `release.yml` بنابراین یک گام
+  fetch گرفتند (`e2e.yml` از قبل داشت). آن تغییر در کامیت دنبال‌کننده است که
+  مثل بقیهٔ فایل‌های workflow بدون scope ‏`workflows` قابل push نیست.
+- تأیید در این checkout: تغییری در `src/` نیست، پس
+  `python3 tools/gen_status.py --check` (۴۲ ماژول/۴۴۸ تست/۰ تابع مرده) و
+  `python3 tools/lint_docs.py` (۰ نقص) و `cd uitest && npm test`
+  (۳۷۵ پاس/۰ شکست) بدون تغییر سبز می‌مانند. خودِ رفع روی ویندوز واقعی تأیید
+  شده است (همان panic گزارش‌شده دیگر تولید نمی‌شود) ولی build کامل همچنان
+  `NOT TESTED` در این sandbox است چون toolchain Rust اینجا قابل نصب نیست.
+- Rollback: حذف این فایل همان panic کهنه را برمی‌گرداند؛ تنها راه امن‌تر،
+  ست‌کردن دستی `WINDIVERT_PATH` به ریشهٔ ریپو قبل از هر cargo است.
+
 ## [Unreleased] — `main.rs` dead WFP spec calls (۲۰۲۶-۰۹-۱۲) — `PARTIAL_UNVERIFIED`
 
 - **`src/main.rs` — سه فراخوانی مرده حذف شد** (پیش‌تر خط‌های ۷۶۹-۷۷۱):
