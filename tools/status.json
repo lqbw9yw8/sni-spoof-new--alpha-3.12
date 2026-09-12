@@ -1,5 +1,5 @@
 {
-  "commit": "42d9f52",
+  "commit": "d28fce9",
   "modules": {
     "anti_fingerprint": {
       "lines": 192,
@@ -156,7 +156,7 @@
       "unsafe": false
     },
     "main": {
-      "lines": 1393,
+      "lines": 1408,
       "tests": 7,
       "tag": null,
       "win": 8,

@@ -766,10 +766,25 @@ fn backend_main() {
         );
     }
 
-    let _ = dpi_guard::dns_guard::init_wfp_hook_spec();
-    let _ = dpi_guard::dns_guard::dns_protection_filters();
-    let _ = dpi_guard::dns_guard::block_port_53_except_localhost_spec();
-
+    // The three `*_spec()` constructors in dns_guard (init_wfp_hook_spec,
+    // dns_protection_filters, block_port_53_except_localhost_spec) used to be
+    // called here with their results discarded. They are pure constructors that
+    // only build a description struct: no BFE call, no side effect, no Result.
+    // Calling them installed nothing, and keeping them next to this log line
+    // made them look like the thing that arms DNS protection. They are exercised
+    // by the unit tests in dns_guard.rs and are deliberately not called here.
+    //
+    // The real installation is `_dns_wfp_guard` in this same function body,
+    // assigned from dns_guard::block_port_53_except_localhost(). Its failure
+    // path already called std::process::exit(1), and the binding is held until
+    // backend_main returns -- past engine::capture_loop -- because dropping a
+    // WfpGuard removes every filter and closes the BFE session.
+    //
+    // So the line below is accurate only because of that guard, not because of
+    // anything adjacent to it. If you ever move or remove `_dns_wfp_guard`,
+    // this log becomes a false claim that plaintext DNS protection is active;
+    // move the log with it. (This is the K-4/F-05 pattern: a call that looks
+    // load-bearing, plus an unconditional success message beside it.)
     log::info!(
         "plaintext DNS protection is active: WFP blocks outbound port 53 except loopback; \
          DoH remains the resolver path for relay destinations."

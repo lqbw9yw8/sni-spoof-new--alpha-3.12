@@ -148,8 +148,18 @@ def check_repo_identity(canonical):
                 slug = m.group(1)
                 if slug.split("/")[0] != owner:
                     continue
-                # strip a trailing /path or anchor for comparison
-                base = slug.split("/")[0] + "/" + slug.split("/")[1].split(".")[0]
+                # The regex character class excludes "/", so `slug` is already
+                # just `owner/name` — a trailing /path, /tree/main or #anchor is
+                # never captured. The only suffix that can appear is a literal
+                # `.git` from a clone URL.
+                #
+                # Do NOT normalise with `.split(".")[0]`: that truncates at the
+                # first dot, so a repository whose *name* contains a dot (e.g.
+                # `sni-spoof-new--alpha-3.12`) was compared as
+                # `sni-spoof-new--alpha-3` and flagged as linking to a foreign
+                # repo even when the link was exactly this one. Strip only a
+                # trailing `.git`.
+                base = slug[: -len(".git")] if slug.endswith(".git") else slug
                 if base != canonical:
                     v("repo-identity", doc, n,
                       f"links to `{slug}` but this repository is `{canonical}`")
@@ -253,6 +263,28 @@ def check_local_links():
                     v("dead-link", doc, n, f"link target `{target}` does not exist")
 
 
+def is_gitignored(path):
+    """True if .gitignore deliberately excludes `path` from the repository.
+
+    `check_workflow_paths` exists to catch a workflow that copies a file which
+    was never committed (the START_HERE.md bug). That premise does not hold for
+    paths the repository *intentionally* does not track: e2e.yml copies
+    WinDivert.dll/WinDivert64.sys into place after scripts/fetch-windivert.ps1
+    downloads and SHA-256-verifies them at run time, and .gitignore keeps them
+    out of git on purpose (see ci/README.md and build-windows.bat).
+
+    Those are runtime artifacts, not missing sources, so they are exempt. A
+    genuinely absent tracked file — the original bug — is not gitignored and is
+    still reported.
+    """
+    try:
+        return subprocess.call(
+            ["git", "-C", ROOT, "check-ignore", "--quiet", "--", path],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+    except Exception:
+        return False
+
+
 def check_workflow_paths():
     """Files referenced by CI workflows must exist (START_HERE.md bug)."""
     wf = os.path.join(ROOT, ".github", "workflows")
@@ -269,6 +301,8 @@ def check_workflow_paths():
                 if src.startswith("target/"):
                     continue  # build output
                 if not os.path.exists(os.path.join(ROOT, src)):
+                    if is_gitignored(src):
+                        continue  # fetched/generated at run time by design
                     v("workflow-path", f".github/workflows/{name}", n,
                       f"copies `{src}` which is not in the repository")
 
