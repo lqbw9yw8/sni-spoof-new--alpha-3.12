@@ -1,0 +1,83 @@
+# dpi_guard — files that must never be committed.
+#
+# This file is load-bearing in two ways:
+#   1. Privacy/security: the runtime files below are written next to the
+#      executable on the operator's machine and contain resolved server IPs,
+#      proxy state, and the Web UI bearer token. Committing them leaks both
+#      the relay/DNS topology and a live credential.
+#   2. The uitest suite reads it: uitest/test-resilience.mjs asserts
+#      "the cache file is gitignored (it can contain server IPs)" and crashes
+#      with ENOENT if this file is absent, which silently drops 60 checks from
+#      `npm test`. Do not delete it.
+
+# ── Rust / build output ────────────────────────────────────────────────────
+/target/
+**/*.rs.bk
+# Staged release/artifact directories produced by ci/build-windows.yml and the
+# release workflow (exe + example toml + READ_ME_FIRST).
+/dist/
+
+# ── cargo-fuzz output ──────────────────────────────────────────────────────
+# fuzz/README.md: "`target/` and `fuzz/artifacts/` are intentionally ignored".
+# A crash reproducer under fuzz/artifacts/ is evidence to be attached to the
+# finding and inspected, not committed — but never delete it either.
+fuzz/target/
+fuzz/artifacts/
+fuzz/corpus/
+fuzz/coverage/
+
+# ── WinDivert field-capture evidence (e2e job) ─────────────────────────────
+# pktmon ETL and the converted pcapng are large binaries attached to a run as
+# artifacts, not committed. scripts/assert-e2e-pcap.py consumes them locally.
+*.etl
+*.pcapng
+
+# ── Local configuration (contains the Web UI token) ────────────────────────
+# dpi_guard.toml is the operator's real config. dpi_guard.toml.example is the
+# shipped template and MUST stay tracked — src/config.rs:1105 loads it via
+# CARGO_MANIFEST_DIR and the test suite expects it to exist.
+dpi_guard.toml
+!dpi_guard.toml.example
+
+# ── Runtime state written next to the executable ───────────────────────────
+# src/dns_cache.rs:46   CACHE_FILE_NAME — resolved server IPs
+dpi_guard.dns_cache
+# src/singleton.rs      instance lock
+dpi_guard.instance.lock
+# src/proxy_cleanup.rs  system proxy state captured for restore
+dpi_guard.proxy_state
+# src/native_gui.rs     GUI preferences
+dpi_guard_ui_settings.json
+
+# ── Logs ───────────────────────────────────────────────────────────────────
+# src/observability.rs:110 — rotating JSON-lines event log plus its backups.
+logs/
+dpi_guard-events.jsonl
+dpi_guard-events.jsonl.*
+
+# ── Official WinDivert SDK binaries ────────────────────────────────────────
+# scripts/fetch-windivert.sh / .ps1 download these next to the repo root after
+# verifying SHA-256 pins. They are redistributable driver binaries, never
+# committed (see build-windows.bat and ci/README.md). Anchored to the root so
+# unrelated files elsewhere in the tree are unaffected.
+/WinDivert.dll
+/WinDivert.lib
+/WinDivert.a
+/WinDivert.exp
+/WinDivert.pdb
+/WinDivert32.sys
+/WinDivert64.sys
+/WinDivert-*.zip
+
+# ── Node (uitest harness) ──────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── Python tooling caches (tools/, scripts/) ───────────────────────────────
+__pycache__/
+*.py[cod]
+
+# ── OS / editor noise ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
