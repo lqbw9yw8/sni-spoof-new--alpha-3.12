@@ -9,6 +9,45 @@
 Baseline source release. Publish only after the Windows CI/release workflow
 has produced and verified the signed/checksummed artifact.
 
+## [Unreleased] — `main.rs` dead WFP spec calls (۲۰۲۶-۰۹-۱۲) — `PARTIAL_UNVERIFIED`
+
+- **`src/main.rs` — سه فراخوانی مرده حذف شد** (پیش‌تر خط‌های ۷۶۹-۷۷۱):
+  `init_wfp_hook_spec()`، `dns_protection_filters()` و
+  `block_port_53_except_localhost_spec()` با `let _ =` صدا زده می‌شدند. این‌ها
+  سازندهٔ خالص struct هستند (بدون فراخوانی BFE، بدون side effect، بدون
+  `Result`)، پس نتیجه‌شان بلافاصله دور ریخته می‌شد و هیچ چیزی نصب نمی‌شد.
+  نصب واقعی WFP در همان تابع با `_dns_wfp_guard` انجام می‌شود و مسیر شکستش
+  `exit(1)` است (fail-closed).
+  خطر واقعی همین بود که این سه خط **کنار** `log::info!("plaintext DNS
+  protection is active")` نشسته بودند و باربرینگ به نظر می‌رسیدند: اگر
+  رفکتور بعدی guard واقعی را حذف می‌کرد و این‌ها را نگه می‌داشت، محافظت خاموش
+  می‌شد ولی log ادعای فعال بودن می‌کرد — همان الگوی K-4/F-05 که خود پروژه قبلاً
+  باگ اعلام کرده. جای آن‌ها اکنون کامنتی است که صریحاً می‌گوید آن log صحتش را
+  از `_dns_wfp_guard` می‌گیرد و اگر جابه‌جایش کنید باید log را هم ببرید.
+- **بررسی شد که باگ زودهنگام drop نیست.** چون `dns_guard.rs:75` هشدار می‌دهد
+  drop شدن `WfpGuard` همهٔ فیلترها را حذف می‌کند، scope این binding مستقیماً از
+  روی کد خوانده شد: `_dns_wfp_guard` یک binding مستقیم در بدنهٔ
+  `backend_main()` است (خط ۵۲۴، match تا خط ۵۳۳ بسته می‌شود) و تا انتهای تابع
+  (خط ۱۲۰۲) زنده می‌ماند، یعنی **بعد از** `engine::capture_loop` در خط ۸۱۹.
+  محافظت هنگام capture برقرار است.
+- هر سه تابع با حذف این فراخوانی‌ها **مرده نشدند**: هر سه همچنان توسط تست‌های
+  واحد خودشان در `dns_guard.rs` (خط‌های ۶۷۰، ۶۷۵، ۶۸۵) صدا زده می‌شوند.
+  `tools/gen_status.py` این را تأیید می‌کند: **۰ تابع مرده، ۴۴۸ تست** بدون
+  تغییر. فقط شمار خط ماژول `main` از ۱۳۹۳ به ۱۴۰۸ رفت و `TEST_MATRIX.md` /
+  `tools/status.json` با خود ژنراتور بازتولید شدند (نه دستی).
+- تأیید در این checkout: `cd uitest && npm test` → **۳۷۵ پاس، ۰ شکست**؛
+  `python3 tools/gen_status.py --check` و `python3 tools/lint_docs.py` →
+  ۰ نقص؛ `git diff --check` → ۰.
+- **محدودیت:** این ویرایش با `cargo build` کامپایل‌چک **نشده** —
+  `static.rust-lang.org`، `sh.rustup.rs` و `static.crates.io` در این محیط با
+  `SSL_ERROR_SYSCALL` مسدود هستند، پس هیچ toolchain جدیدتر از Rust ۱.۷۵ِ apt
+  قابل نصب نیست و build کامل به‌دلیل نیاز `icu_normalizer_data` به
+  `edition2024` (Rust ≥ ~۱.۸۵) ممکن نیست. ریسک سینتکسی این ویرایش عملاً صفر
+  است (حذف سه statement کامل + افزودن کامنت؛ خالص دلیمیترها `(0,0)`)، ولی صحت
+  کامپایل جایگزین نمی‌شود.
+- Rollback: `git revert` این کامیت. بازگرداندن سه خط مرده بی‌ضرر ولی گمراه‌کننده
+  است؛ کامنت توضیحی را نگه دارید.
+
 ## [Unreleased] — Restoring `.github/workflows/` and `.gitignore` after the squash upload (۲۰۲۶-۰۹-۱۲) — `PARTIAL_UNVERIFIED`
 
 این ریپو (`sni-spoof-new--alpha-3.12`) با یک کامیت squash شده ساخته شده
