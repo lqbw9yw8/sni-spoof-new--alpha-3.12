@@ -1350,7 +1350,7 @@ impl Pipeline {
         if let Some(m) = adaptive {
             log::debug!(
                 "adaptive desync for {}: {}",
-                hash_sensitive(domain, run_salt()),
+                hash_sensitive(&domain, run_salt()),
                 m.as_str()
             );
         }
